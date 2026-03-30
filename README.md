@@ -36,11 +36,12 @@ An instant, fully automated Telegram bot that notifies you the moment Epic Games
 1. Create a bot via **@BotFather** on Telegram and save the **API Token**.
 2. Get your **Chat ID** (the numbers) from the `@getUpdates` URL as described in the code.
 
-### Step 2 — GitHub Configuration
-1. Ensure your repository contains:
-   - `epic_free_game_bot.py` (The updated Flask/Polling version).
-   - `requirements.txt` (Must contain `requests`, `flask`, and `python-telegram-bot`).
+### Step 2 — Get your Chat ID
 
+Message your new bot anything (e.g. "hi")
+Open this URL in browser: https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates
+Find "chat" → "id" in the response — that's your Chat ID
+you must change your chat id in epic_free_game_bot.py in code
 ### Step 3 — Deploy to Render
 1. Create a free account at [Render.com](https://render.com) and connect your GitHub.
 2. Select **New +** → **Web Service**.
