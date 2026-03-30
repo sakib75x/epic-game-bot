@@ -33,7 +33,7 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Bot is running with Auto-Notifications!"
+    return "OK", 200  # Sends only 2 characters, keeping the output tiny
 
 def run_flask():
     port = int(os.environ.get("PORT", 5000))
