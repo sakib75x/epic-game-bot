@@ -10,7 +10,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Cont
 
 # --- CONFIGURATION ---
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
-CHAT_ID = "1188421559" 
+CHAT_ID = "1188421559" # Change your chat id or you will not get any update
 EPIC_API_URL = "https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions?locale=en-US&country=BD&allowCountries=BD"
 SEEN_FILE = "seen_games.json"
 
