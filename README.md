@@ -4,7 +4,8 @@ A free, fully automated Telegram bot that notifies you whenever the Epic Games S
 
 Host it for 100% free on **Render.com** (no credit card required).
 
----
+---<img width="463" height="784" alt="image" src="https://github.com/user-attachments/assets/a91c0592-8227-472a-b75a-e593f38dfcca" />
+
 
 ## ✨ Features
 
