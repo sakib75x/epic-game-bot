@@ -1,0 +1,25 @@
+name: Epic Free Game Bot
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # runs every hour, 24/7
+  workflow_dispatch:       # lets you run it manually from GitHub
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run bot
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        run: python epic_free_game_bot.py
