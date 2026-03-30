@@ -1,131 +1,130 @@
 import os
+import json
 import requests
 import asyncio
 import threading
+import logging
 from flask import Flask
-from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
-# --- CONFIGURATION (Environment Variables) ---
-# These are pulled from Render's Environment Settings for security
+# --- LOGGING SETUP ---
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# --- CONFIGURATION ---
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 CHAT_ID = os.environ.get("CHAT_ID")
 EPIC_API_URL = "https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions?locale=en-US&country=US&allowCountries=US"
+DB_FILE = "seen_games.json"
 
 app = Flask(__name__)
 
-# --- FLASK SERVER (For Health Checks & Cron-job) ---
+# --- PERSISTENCE HELPERS ---
+def load_seen_games():
+    if os.path.exists(DB_FILE):
+        with open(DB_FILE, 'r') as f:
+            return set(json.load(f))
+    return set()
+
+def save_seen_games(seen_set):
+    with open(DB_FILE, 'w') as f:
+        json.dump(list(seen_set), f)
+
+# --- FLASK SERVER ---
 @app.route('/')
 def home():
-    # Minimal output to keep Cron-job.org happy and green
-    return "OK", 200
+    return "BOT_STATUS: ACTIVE", 200
 
 def run_flask():
-    # Render uses port 10000 by default
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port)
 
 # --- EPIC GAMES LOGIC ---
 def get_free_games():
     try:
-        response = requests.get(EPIC_API_URL, timeout=10)
+        response = requests.get(EPIC_API_URL, timeout=15)
+        response.raise_for_status()
         data = response.json()
-        games = data['data']['Catalog']['searchStore']['elements']
+        elements = data['data']['Catalog']['searchStore']['elements']
         
-        current_games = []
-        upcoming_games = []
-        
-        for game in games:
-            promotions = game.get('promotions')
-            if not promotions:
-                continue
+        current, upcoming = [], []
+        for game in elements:
+            promos = game.get('promotions')
+            if not promos: continue
+            
+            # Extract Slug for the URL
+            slug = game.get('productSlug') or (game.get('catalogNs', {}).get('mappings', [{}])[0].get('pageSlug'))
+            game['url_slug'] = slug
+
+            if promos.get('promotionalOffers') and promos['promotionalOffers'][0]['promotionalOffers']:
+                current.append(game)
+            elif promos.get('upcomingPromotionalOffers') and promos['upcomingPromotionalOffers'][0]['promotionalOffers']:
+                upcoming.append(game)
                 
-            # Check for active free games
-            active_promos = promotions.get('promotionalOffers')
-            if active_promos and active_promos[0]['promotionalOffers']:
-                current_games.append(game)
-                
-            # Check for upcoming free games
-            upcoming_promos = promotions.get('upcomingPromotionalOffers')
-            if upcoming_promos and upcoming_promos[0]['promotionalOffers']:
-                upcoming_games.append(game)
-                
-        return current_games, upcoming_games
+        return current, upcoming
     except Exception as e:
-        print(f"Error fetching games: {e}")
+        logger.error(f"API Error: {e}")
         return [], []
 
 # --- TELEGRAM HANDLERS ---
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        [InlineKeyboardButton("🎮 Current Free Games", callback_query_data='current')],
-        [InlineKeyboardButton("⏳ Upcoming Games", callback_query_data='upcoming')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("Welcome! Click a button to check Epic Games Store freebies:", reply_markup=reply_markup)
+    keyboard = [[InlineKeyboardButton("🎮 Current Deals", callback_query_data='current')],
+                [InlineKeyboardButton("⏳ Coming Soon", callback_query_data='upcoming')]]
+    await update.message.reply_text("✨ **Epic Games Tracker**\nClick below to see active freebies:", 
+                                   reply_markup=InlineKeyboardMarkup(keyboard), parse_mode='Markdown')
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    
     current, upcoming = get_free_games()
     
     if query.data == 'current':
-        text = "<b>🌟 Current Free Games:</b>\n\n"
+        msg = "<b>🌟 Available Now:</b>\n\n"
         for g in current:
-            text += f"▪️ {g['title']}\n🔗 <a href='https://store.epicgames.com/en-US/p/{g['catalogNs']['mappings'][0]['pageSlug']}'>Claim Here</a>\n\n"
+            msg += f"▪️ {g['title']}\n🔗 <a href='https://store.epicgames.com/en-US/p/{g['url_slug']}'>Claim Now</a>\n\n"
     else:
-        text = "<b>⏳ Upcoming Free Games:</b>\n\n"
+        msg = "<b>⏳ Upcoming:</b>\n\n"
         for g in upcoming:
-            text += f"▪️ {g['title']} (Coming Soon)\n"
+            msg += f"▪️ {g['title']} (Starts soon)\n"
             
-    await query.edit_message_text(text=text, parse_mode='HTML', disable_web_page_preview=False)
+    await query.edit_message_text(text=msg, parse_mode='HTML')
 
-# --- AUTO-CHECKER TASK ---
+# --- BACKGROUND CHECKER ---
 async def auto_check(application: Application):
-    # This keeps track of games already notified (in memory for simplicity)
-    last_notified = set()
-    
+    seen_games = load_seen_games()
     while True:
         current, _ = get_free_games()
+        changed = False
         for game in current:
-            game_id = game['id']
-            if game_id not in last_notified:
-                message = f"🚨 <b>NEW FREE GAME!</b>\n\n<b>{game['title']}</b> is now FREE on Epic Games!\n\n🔗 <a href='https://store.epicgames.com/en-US/p/{game['catalogNs']['mappings'][0]['pageSlug']}'>Claim Now</a>"
-                await application.bot.send_message(chat_id=CHAT_ID, text=message, parse_mode='HTML')
-                last_notified.add(game_id)
+            if game['id'] not in seen_games:
+                msg = (f"🚨 <b>NEW FREE GAME!</b>\n\n"
+                       f"<b>{game['title']}</b> is now FREE!\n"
+                       f"🔗 <a href='https://store.epicgames.com/en-US/p/{game['url_slug']}'>Claim Here</a>")
+                try:
+                    await application.bot.send_message(chat_id=CHAT_ID, text=msg, parse_mode='HTML')
+                    seen_games.add(game['id'])
+                    changed = True
+                except Exception as e:
+                    logger.error(f"Send Error: {e}")
         
-        # Check every hour
-        await asyncio.sleep(3600)
+        if changed:
+            save_seen_games(seen_games)
+        await asyncio.sleep(3600) # Check every hour
 
-# --- MAIN RUNNER (Python 3.14+ Fix) ---
-async def start_bot():
-    # 1. Start Flask in background
+async def main():
     threading.Thread(target=run_flask, daemon=True).start()
     
-    # 2. Setup Bot
     application = Application.builder().token(BOT_TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_handler))
     
-    # 3. Initialize & Start
     await application.initialize()
     await application.start()
-    
-    # 4. Start Background Task
     asyncio.create_task(auto_check(application))
-    
-    # 5. Run Polling
     await application.updater.start_polling()
-    print("🚀 Bot is live and listening...")
     
-    # Keep main task alive
-    while True:
-        await asyncio.sleep(3600)
+    while True: await asyncio.sleep(3600)
 
 if __name__ == '__main__':
-    try:
-        asyncio.run(start_bot())
-    except (KeyboardInterrupt, SystemExit):
-        pass
+    asyncio.run(main())
