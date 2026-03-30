@@ -1,185 +1,77 @@
-# 🎮 Epic Free Games Telegram Bot
 
-A free, fully automated Telegram bot that notifies you whenever Epic Games Store drops a new free game — and lets you check current & upcoming free games anytime with a button click.
+# 🎮 Epic Free Games Telegram Bot (24/7 Edition)
 
-No server needed. Runs 100% free on GitHub Actions.
+An instant, fully automated Telegram bot that notifies you the moment Epic Games Store drops a new free game. Unlike the old version, this runs **24/7 on Render**, providing instant button responses and real-time alerts.
 
 ---
 
 ## ✨ Features
 
-- 🚨 **Auto notifications** — get a Telegram message the moment a new free game drops
-- 🎮 `/games` — see all current free games with claim links
-- ⏭ `/next` — see upcoming free games before they drop
-- 🖱️ **Clickable buttons** — no need to type commands, just tap
-- 💸 **Completely free** — runs on GitHub Actions, no server, no credit card
-- ⚡ **Checks every 5 minutes** — buttons respond fast
+- 🚀 **Instant Response** — Buttons like `/games` and `/next` respond in under a second.
+- 🚨 **Auto-Notifications** — The bot checks the store every hour and alerts you automatically when a new game is found.
+- 🖼️ **Rich Formatting** — Beautiful messages with emojis, original prices (strikethrough), and direct claim links.
+- ☁️ **Cloud Hosted** — Runs on Render.com's free tier, so your PC doesn't need to be on.
+- 💾 **Smart Memory** — Remembers which games it has already shown you to avoid spam.
 
 ---
 
 ## 📸 Preview
 
-```
-🚨 New FREE Game on Epic!
+```text
+🎮 New FREE Game Alert!
 
-🎮 Havendock  ~~$19.99~~ → FREE
+🕹 Havendock ~~$19.99~~ → FREE
 🗓 Free until: 2026-04-02
 
 📖 Build and manage your own floating town...
 
-🔗 Claim for FREE →
-```
-
-Buttons:
-```
-[ 🎮 Current Free Games ]  [ ⏭ Next Free Games ]
-[        🔗 Open Epic Store        ]
+🔗 Claim Now →
 ```
 
 ---
 
-## 🚀 Setup Guide
+## 🚀 Setup Guide (Render.com)
 
-### Step 1 — Create a Telegram Bot
+### Step 1 — Create your Bot & Chat ID
+1. Create a bot via **@BotFather** on Telegram and save the **API Token**.
+2. Get your **Chat ID** (the numbers) from the `@getUpdates` URL as described in the code.
 
-1. Open Telegram and search for **@BotFather**
-2. Send `/newbot` and follow the instructions
-3. Copy the **API token** you receive (looks like `123456789:ABCdef...`)
+### Step 2 — GitHub Configuration
+1. Ensure your repository contains:
+   - `epic_free_game_bot.py` (The updated Flask/Polling version).
+   - `requirements.txt` (Must contain `requests`, `flask`, and `python-telegram-bot`).
 
-### Step 2 — Get your Telegram Chat ID
+### Step 3 — Deploy to Render
+1. Create a free account at [Render.com](https://render.com) and connect your GitHub.
+2. Select **New +** → **Web Service**.
+3. Use these settings:
+   - **Runtime**: `Python 3`.
+   - **Build Command**: `pip install -r requirements.txt`.
+   - **Start Command**: `python epic_free_game_bot.py`.
+4. Go to the **Environment** tab and add:
+   - `BOT_TOKEN`: (Your Telegram Token from BotFather).
 
-1. Send any message to your new bot (e.g. "hi")
-2. Open this URL in your browser (replace with your token):
-   ```
-   https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates
-   ```
-3. Find `"chat"` → `"id"` in the response — that's your Chat ID
-4. If the result is empty, try:
-   ```
-   https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates?offset=-1
-   ```
-
-### Step 3 — Fork this Repository
-
-1. Click the **Fork** button at the top right of this page
-2. This creates your own copy of the bot
-
-### Step 4 — Add your Bot Token as a Secret
-
-1. Go to your forked repo → **Settings** → **Secrets and variables** → **Actions**
-2. Click **"New repository secret"**
-3. Name: `BOT_TOKEN`
-4. Value: paste your Telegram bot token
-5. Click **"Add secret"**
-
-### Step 5 — Add your Chat ID to the bot file
-
-1. In your repo, open `epic_free_game_bot.py`
-2. Click the **pencil ✏️** icon to edit
-3. Find this line near the top:
-   ```python
-   CHAT_ID = "YOUR_CHAT_ID"
-   ```
-4. Replace `YOUR_CHAT_ID` with your actual Chat ID (e.g. `"123456789"`)
-5. Click **"Commit changes"**
-
-### Step 6 — Enable GitHub Actions
-
-1. Go to the **Actions** tab in your repo
-2. If you see a warning, click **"I understand my workflows, enable them"**
-
-### Step 7 — Test it manually
-
-1. Go to **Actions** tab → click **"Epic Free Game Bot"** on the left
-2. Click **"Run workflow"** → **"Run workflow"** (green button)
-3. Wait ~30 seconds
-4. Send `/start` to your Telegram bot — you should see the menu with buttons!
-
----
-
-## 🔧 How it Works
-
-```
-Every 5 minutes (GitHub Actions)
-         │
-         ├── Check Epic Games API for new free games
-         │       └── If new game found → send Telegram notification
-         │
-         └── Listen for 55 seconds for button clicks / commands
-                 ├── /start  → show welcome message + buttons
-                 ├── /games  → show current free games
-                 └── /next   → show upcoming free games
-```
-
-GitHub Actions caches the state (seen games + message offset) between runs so the bot remembers which games it already notified you about.
-
----
-
-## 📁 File Structure
-
-```
-epic-game-bot/
-├── epic_free_game_bot.py      # Main bot code
-└── .github/
-    └── workflows/
-        └── run_bot.yml        # GitHub Actions schedule config
-```
-
----
-
-## ⚙️ Configuration
-
-All configuration is at the top of `epic_free_game_bot.py`:
-
-| Variable | Description |
-|---|---|
-| `BOT_TOKEN` | Pulled from GitHub Secrets automatically |
-| `CHAT_ID` | Your Telegram Chat ID (set this manually) |
-| `EPIC_API_URL` | Epic Games Store API endpoint |
-
-To change the country/locale, edit the `EPIC_API_URL`:
-```python
-EPIC_API_URL = (
-    "https://store-site-backend-static.ak.epicgames.com/freeGamesPromotions"
-    "?locale=en-US&country=US&allowCountries=US"  # change BD to your country code
-)
-```
+### Step 4 — Keep it Awake (Optional but Recommended)
+Render's free tier "sleeps" after 15 minutes of inactivity. To keep the bot instant:
+1. Use a service like **Cron-job.org**.
+2. Point it to your Render URL (e.g., `https://your-bot-name.onrender.com`) every 10 minutes.
 
 ---
 
 ## 🛠 Troubleshooting
 
-**Bot not sending messages?**
-- Check that `BOT_TOKEN` secret is set correctly in GitHub
-- Make sure your `CHAT_ID` is correct in the bot file
-- Go to Actions tab and check the run logs for errors
+**Bot isn't responding?**
+- Check the **Logs** tab on Render. If you see `Bot started and listening...`, the code is fine.
+- Check the **Environment** tab to ensure your `BOT_TOKEN` is correct.
 
-**Buttons not responding?**
-- Buttons respond within 5 minutes (that's how often GitHub Actions runs)
-- Check the Actions tab to make sure workflows are enabled
-
-**Getting empty `[]` when finding Chat ID?**
-- Send your bot a message first, THEN open the getUpdates URL
-- Or add `?offset=-1` to the URL
-
-**Actions tab says workflows are disabled?**
-- Go to Actions tab → click "Enable workflows"
+**First click is slow?**
+- If you don't use a "ping" service, the first click after a long break might take 30-50 seconds to wake Render up. After that, it stays instant.
 
 ---
 
 ## 📄 License
-
 MIT License — free to use, modify, and share.
 
 ---
 
-## 🙏 Credits
-
-Built with:
-- [python-telegram-bot](https://core.telegram.org/bots/api) (Telegram Bot API)
-- [Epic Games Store API](https://store.epicgames.com)
-- [GitHub Actions](https://github.com/features/actions)
-
----
-
-> ⭐ If this bot helped you grab free games, consider starring the repo!
+**Would you like me to help you set up the Cron-job.org ping to make sure the bot never sleeps?**
