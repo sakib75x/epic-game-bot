@@ -115,17 +115,33 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await context.bot.send_message(chat_id=update.callback_query.message.chat_id, text=text, parse_mode='HTML')
 
 # --- MAIN ---
-def main():
+async def start_bot():
+    # 1. Start the Flask server in a separate thread
     threading.Thread(target=run_flask, daemon=True).start()
+    
+    # 2. Build the Telegram Application
     application = Application.builder().token(BOT_TOKEN).build()
+    
+    # 3. Add handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_handler))
     
-    # Start the auto-checker in the background
-    loop = asyncio.get_event_loop()
-    loop.create_task(auto_check(application))
+    # 4. Initialize the application
+    await application.initialize()
+    await application.start()
     
-    application.run_polling()
+    # 5. Start the auto-checker task
+    asyncio.create_task(auto_check(application))
+    
+    # 6. Run the bot polling
+    await application.updater.start_polling()
+    
+    # Keep the bot running
+    while True:
+        await asyncio.sleep(3600)
 
 if __name__ == '__main__':
-    main()
+    try:
+        asyncio.run(start_bot())
+    except (KeyboardInterrupt, SystemExit):
+        pass
